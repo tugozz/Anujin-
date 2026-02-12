@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>I Love U Anujin - Interactive</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: black;
+      }
+      canvas {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas"></canvas>
+
+    <script>
+      const canvas = document.getElementById("canvas");
+      const ctx = canvas.getContext("2d");
+
+      let width = window.innerWidth;
+      let height = window.innerHeight;
+      canvas.width = width;
+      canvas.height = height;
+
+      const fontSize = 18;
+      const phrases = [
+        "I love you",
+        "Te amo",
+        "Je t'aime",
+        "Ich liebe dich",
+        "Ti amo",
+        "愛してる",
+        "사랑해",
+        "Я тебя люблю",
+        "Eu te amo",
+        "Σ' αγαπώ",
+        "Mahal kita",
+        "Te iubesc",
+        "Seni seviyorum",
+        "Wo ai ni",
+        "Main tumse pyaar karta hoon",
+      ];
+
+      const drops = [];
+      const maxDrops = 100;
+      for (let i = 0; i < maxDrops; i++) {
+        drops.push({
+          x: Math.random() * width,
+          y: Math.random() * -height,
+          speed: 1 + Math.random() * 3,
+          text: phrases[Math.floor(Math.random() * phrases.length)],
+        });
+      }
+
+      const heartPixels = [];
+      function isInHeart(x, y, scale = 10) {
+        x = (x - width / 2) / scale;
+        y = (y - height / 2) / scale;
+        const a = x * x + y * y - 1;
+        return a * a * a - x * x * y * y * y <= 0;
+      }
+
+      const settledTexts = [];
+      for (let y = 0; y < height; y += fontSize) {
+        for (let x = 0; x < width; x += fontSize) {
+          if (isInHeart(x, y)) heartPixels.push({ x, y });
+        }
+      }
+
+      // Fireflies particles
+      const particles = Array.from({ length: 50 }, () => ({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        radius: Math.random() * 2 + 1,
+        dx: (Math.random() - 0.5) * 0.5,
+        dy: (Math.random() - 0.5) * 0.5,
+      }));
+
+      // Heart outline drawing control
+      let heartDrawProgress = 0;
+      const heartOutline = heartPixels.slice().sort(() => Math.random() - 0.5); // randomized draw order
+
+      // New: Hearts spawned by mouse click
+      const clickHearts = [];
+
+      function createClickHeart(x, y) {
+        clickHearts.push({
+          x,
+          y,
+          alpha: 1,
+          size: 10 + Math.random() * 10,
+          dy: 1 + Math.random() * 2,
+          dx: (Math.random() - 0.5) * 1,
+        });
+      }
+
+      canvas.addEventListener("click", (e) => {
+        createClickHeart(e.clientX, e.clientY);
+      });
+
+      // Draw heart shape for click hearts (using path)
+      function drawHeartShape(ctx, x, y, size) {
+        ctx.save();
+        ctx.beginPath();
+        const topCurveHeight = size * 0.3;
+        ctx.moveTo(x, y + topCurveHeight);
+        ctx.bezierCurveTo(
+          x,
+          y,
+          x - size / 2,
+          y,
+          x - size / 2,
+          y + topCurveHeight
+        );
+        ctx.bezierCurveTo(
+          x - size / 2,
+          y + (size + topCurveHeight) / 2,
+          x,
+          y + (size + topCurveHeight) / 2,
+          x,
+          y + size
+        );
+        ctx.bezierCurveTo(
+          x,
+          y + (size + topCurveHeight) / 2,
+          x + size / 2,
+          y + (size + topCurveHeight) / 2,
+          x + size / 2,
+          y + topCurveHeight
+        );
+        ctx.bezierCurveTo(x + size / 2, y, x, y, x, y + topCurveHeight);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function draw() {
+        ctx.fillStyle = "rgba(0,0,0,0.1)";
+        ctx.fillRect(0, 0, width, height);
+
+        // Fireflies
+        for (let p of particles) {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+          ctx.fillStyle = "rgba(255, 255, 200, 0.6)";
+          ctx.fill();
+          p.x += p.dx;
+          p.y += p.dy;
+          if (p.x < 0 || p.x > width) p.dx *= -1;
+          if (p.y < 0 || p.y > height) p.dy *= -1;
+        }
+
+        // Falling text
+        ctx.font = fontSize + "px monospace";
+        ctx.fillStyle = "#FF69B4";
+        ctx.textAlign = "left";
+
+        for (let drop of drops) {
+          ctx.fillText(drop.text, drop.x, drop.y);
+
+          if (isInHeart(drop.x, drop.y)) {
+            settledTexts.push({ text: drop.text, x: drop.x, y: drop.y });
+            drop.x = Math.random() * width;
+            drop.y = Math.random() * -100;
+            drop.text = phrases[Math.floor(Math.random() * phrases.length)];
+            drop.speed = 1 + Math.random() * 3;
+            continue;
+          }
+
+          if (drop.y > height + 30) {
+            drop.y = Math.random() * -100;
+            drop.x = Math.random() * width;
+            drop.text = phrases[Math.floor(Math.random() * phrases.length)];
+            drop.speed = 1 + Math.random() * 3;
+          }
+
+          drop.y += drop.speed;
+        }
+
+        // Settled text
+        for (const t of settledTexts) {
+          ctx.fillText(t.text, t.x, t.y);
+        }
+
+        // Heart outline drawing (live)
+        if (heartDrawProgress < heartOutline.length) {
+          const { x, y } = heartOutline[heartDrawProgress++];
+          ctx.fillStyle = "#FF0000";
+          ctx.fillRect(x, y, 2, 2);
+        }
+
+        // Draw hearts from clicks
+        for (let i = clickHearts.length - 1; i >= 0; i--) {
+          const h = clickHearts[i];
+          ctx.fillStyle = `rgba(255, 0, 100, ${h.alpha})`;
+          drawHeartShape(ctx, h.x, h.y, h.size);
+          h.y -= h.dy;
+          h.x += h.dx;
+          h.alpha -= 0.02;
+          if (h.alpha <= 0) clickHearts.splice(i, 1);
+        }
+
+        // Center message
+        ctx.font = "bold 30px sans-serif";
+        ctx.fillStyle = "#ffffff";
+        ctx.textAlign = "center";
+        ctx.fillText("I love u Urangoo", width / 2, height / 2);
+      }
+
+      setInterval(draw, 40);
+
+      window.addEventListener("resize", () => {
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.width = width;
+        canvas.height = height;
+      });
+    </script>
+  </body>
+</html>
